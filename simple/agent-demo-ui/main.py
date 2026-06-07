@@ -3,11 +3,20 @@ import asyncio
 import os
 import sys
 import subprocess
+import re
+from datetime import datetime
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+# --- 模拟业务系统提交 ---
+def submit_leave_request(name, date, reason):
+    """模拟提交请假到业务系统"""
+    if name and date and reason:
+        return True, f"✅ 提交成功！已为 {name} 提交了 {date} 的请假申请。"
+    return False, "❌ 提交失败：请确保所有信息填写完整。"
 
 # --- 支持 uv run python main.py 启动 ---
 if __name__ == "__main__" and not st.runtime.exists():
@@ -23,7 +32,7 @@ if __name__ == "__main__" and not st.runtime.exists():
 # --- Streamlit 页面配置 ---
 st.set_page_config(page_title="MCP 智能助手", page_icon="🤖", layout="centered")
 st.title("🤖 MCP 智能助手")
-st.caption("支持功能：面积计算、天气预报查询")
+st.caption("支持功能：面积计算、天气预报查询、请假申请")
 
 # 加载环境变量
 load_dotenv()
@@ -73,11 +82,15 @@ def get_agent_and_tools():
     filtered_tools = loop.run_until_complete(initialize())
 
     # 3. 创建系统提示词
+    today = datetime.now().strftime("%Y-%m-%d")
     system_message = SystemMessage(
         content=(
-            "你是一个助手，专门负责计算面积和查询天气预报。"
-            "你只能通过调用提供的工具来回答关于『面积计算』或『天气预报』的问题。"
-            "对于任何其他话题或请求，请礼貌地回答：『抱歉，我目前只支持计算面积和获取天气预报。』"
+            f"今天是 {today}。\n"
+            "你是一个助手，专门负责计算面积、查询天气预报以及处理请假申请。\n"
+            "1. 对于『面积计算』或『天气预报』，请调用提供的工具。\n"
+            "2. 当用户表达『请假』意图时（例如：我要请假、明天想请假），你必须引导用户填写表单。\n"
+            "你必须在回复中包含且仅包含一个特殊触发码：[[LEAVE_FORM:日期]]，其中『日期』应为用户提到的日期（如：2026-06-08）或今天。\n"
+            "3. 对于任何其他话题，请礼貌拒绝并说明你目前只支持上述三项功能。\n"
             "请直接给出答案，不要涉及无关信息。"
         )
     )
@@ -92,6 +105,49 @@ def get_agent_and_tools():
 # 初始化 Agent
 agent = get_agent_and_tools()
 
+# --- 渲染消息函数 ---
+
+def render_message(role, content, index):
+    """渲染单条消息，支持解析特殊触发码并嵌入表单"""
+    with st.chat_message(role):
+        # 查找触发码 [[LEAVE_FORM:YYYY-MM-DD]]
+        pattern = r"\[\[LEAVE_FORM:(.*?)\]\]"
+        match = re.search(pattern, content)
+        
+        if match:
+            # 分割文本，显示触发码之前的描述
+            text_before = content[:match.start()].strip()
+            if text_before:
+                st.markdown(text_before)
+            
+            # 渲染表单
+            date_val = match.group(1)
+            form_key = f"leave_form_{index}"
+            
+            with st.container(border=True):
+                st.markdown("### 📝 请假申请单")
+                # 使用 session_state 存储提交状态，防止刷新消失
+                success_key = f"submit_success_{index}"
+                
+                if success_key in st.session_state:
+                    st.success(st.session_state[success_key])
+                else:
+                    with st.form(key=form_key):
+                        name = st.text_input("申请人姓名")
+                        leave_date = st.text_input("请假日期", value=date_val)
+                        reason = st.text_area("请假原因")
+                        submitted = st.form_submit_button("确认提交")
+                        
+                        if submitted:
+                            success, msg = submit_leave_request(name, leave_date, reason)
+                            if success:
+                                st.session_state[success_key] = msg
+                                st.rerun()
+                            else:
+                                st.error(msg)
+        else:
+            st.markdown(content)
+
 # --- 聊天界面 ---
 
 # 初始化聊天历史
@@ -99,12 +155,11 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 # 显示历史消息
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+for i, message in enumerate(st.session_state.messages):
+    render_message(message["role"], message["content"], i)
 
 # 接收用户输入
-if prompt := st.chat_input("您可以问我面积计算或天气预报的问题..."):
+if prompt := st.chat_input("计算面积、查天气，或者直接说‘我要请假’..."):
     # 添加用户消息到界面
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -131,7 +186,9 @@ if prompt := st.chat_input("您可以问我面积计算或天气预报的问题.
                 asyncio.set_event_loop(loop)
                 full_response = loop.run_until_complete(run_agent())
                 
-                st.markdown(full_response)
+                # 渲染新回复
+                render_message("assistant", full_response, len(st.session_state.messages))
+                # 存储消息
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
             except Exception as e:
                 error_msg = f"发生错误: {e}"
