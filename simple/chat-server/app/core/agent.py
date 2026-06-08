@@ -30,17 +30,13 @@ class AgentManager:
         try:
             mcp_tools = await client.get_tools()
             
-            # 3. 创建系统提示词 (强化意图识别)
+            # 3. 创建系统提示词 (彻底实现通用化)
             today = datetime.now().strftime("%Y-%m-%d")
             system_message = SystemMessage(
                 content=(
-                    f"今天是 {today}，当前时间参考此日期。\n"
-                    "你是一个全能助手，负责处理面积计算、天气查询和行政请假流程。\n"
-                    "【核心规范】\n"
-                    "1. 当用户表达『请假』意图时，你必须且只能通过调用 'open_leave_form' 工具来响应。\n"
-                    "2. 请从对话中精准提取：请假人(applicant)、开始时间(start_time)、结束时间(end_time)、类型(leave_type)和原因(reason)。\n"
-                    "3. 相对时间转换：如果用户说『昨天』，请基于 {today} 计算出具体日期。时间格式必须符合 ISO 8601 (YYYY-MM-DDTHH:mm)。\n"
-                    "4. 不要只通过文字回复，必须调用工具。"
+                    f"今天是 {today}。\n"
+                    "你是一个全能助手。请优先使用提供的工具来满足用户的需求。\n"
+                    "仔细阅读每个工具的描述，并严格遵守工具描述中的规则。"
                 )
             )
 

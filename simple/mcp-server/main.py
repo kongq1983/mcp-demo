@@ -29,11 +29,16 @@ def calculate_area(width: float, length: float) -> str:
 @mcp.tool()
 def open_leave_form(applicant: str, start_time: str, end_time: str, leave_type: str, reason: str) -> str:
     """
-    当用户表达请假意图时，调用此工具以打开请假申请表单。
+    当用户表达请假意图时，必须且只能通过调用此工具来响应，不要只通过文字回复。
+    
+    规则：
+    1. 必须从上下文中精准提取所有参数。
+    2. 时间参数 (start_time, end_time) 必须转换为 ISO 8601 格式 (YYYY-MM-DDTHH:mm)。
+    3. 如果用户说“昨天”或“明天”，请基于系统提供的当前日期进行计算。
     
     :param applicant: 请假人姓名
-    :param start_time: 开始时间 (ISO 8601 格式: YYYY-MM-DDTHH:mm)
-    :param end_time: 结束时间 (ISO 8601 格式: YYYY-MM-DDTHH:mm)
+    :param start_time: 开始时间
+    :param end_time: 结束时间
     :param leave_type: 请假类型 (事假, 病假, 年假, 调休)
     :param reason: 请假原因
     """
