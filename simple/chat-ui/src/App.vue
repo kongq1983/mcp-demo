@@ -14,12 +14,10 @@ const chatContainer = ref(null);
 
 // 表单相关状态
 const showLeaveForm = ref(false);
-const initialLeaveDate = ref('');
+const leaveFormData = ref(null);
 
 const scrollToBottom = async () => {
   await nextTick();
-  // 注意：在组件化后，滚动条可能在 ChatWindow 内部或者由 App 容器处理
-  // 这里我们假设 ChatWindow 暴露了滚动方法或者直接操作 DOM
   const el = document.querySelector('.chat-main');
   if (el) {
     el.scrollTop = el.scrollHeight;
@@ -46,11 +44,18 @@ const handleSendMessage = async (userMsg) => {
       if (data.content) {
         assistantMsg.content += data.content;
         
-        // 检查是否包含请假表单触发词 [[LEAVE_FORM:YYYY-MM-DD]]
-        const leaveMatch = assistantMsg.content.match(/\[\[LEAVE_FORM:(.*?)\]\]/);
-        if (leaveMatch) {
-          initialLeaveDate.value = leaveMatch[1];
-          showLeaveForm.value = true;
+        // 检查是否包含通用的 ACTION 触发词 [[ACTION:{...}]]
+        const actionMatch = assistantMsg.content.match(/\[\[ACTION:(.*?)\]\]/);
+        if (actionMatch) {
+          try {
+            const action = JSON.parse(actionMatch[1]);
+            if (action.type === 'leave') {
+              leaveFormData.value = action.data;
+              showLeaveForm.value = true;
+            }
+          } catch (e) {
+            console.error('解析 ACTION 失败:', e);
+          }
         }
         scrollToBottom();
       } else if (data.error) {
@@ -91,7 +96,7 @@ const handleLeaveSubmit = async (formData) => {
     <ChatWindow :messages="messages">
       <LeaveForm 
         :show="showLeaveForm" 
-        :initial-date="initialLeaveDate"
+        :initial-data="leaveFormData"
         @submit="handleLeaveSubmit"
         @cancel="showLeaveForm = false"
       />

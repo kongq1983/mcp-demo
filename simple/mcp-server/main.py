@@ -26,6 +26,19 @@ def calculate_area(width: float, length: float) -> str:
     area = width * length
     return f"宽度为 {width}，长度为 {length} 的长方形面积为: {area:.2f}"
 
+@mcp.tool()
+def open_leave_form(applicant: str, start_time: str, end_time: str, leave_type: str, reason: str) -> str:
+    """
+    当用户表达请假意图时，调用此工具以打开请假申请表单。
+    
+    :param applicant: 请假人姓名
+    :param start_time: 开始时间 (ISO 8601 格式: YYYY-MM-DDTHH:mm)
+    :param end_time: 结束时间 (ISO 8601 格式: YYYY-MM-DDTHH:mm)
+    :param leave_type: 请假类型 (事假, 病假, 年假, 调休)
+    :param reason: 请假原因
+    """
+    return f"UI_TRIGGER:leave:{{\"applicant\":\"{applicant}\", \"start_time\":\"{start_time}\", \"end_time\":\"{end_time}\", \"leave_type\":\"{leave_type}\", \"reason\":\"{reason}\"}}"
+
 if __name__ == "__main__":
     # 运行 MCP 服务器，默认使用 stdio 传输
     mcp.run(

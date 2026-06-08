@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue';
 
 const props = defineProps({
-  initialDate: String,
+  initialData: Object,
   show: Boolean
 });
 
@@ -10,20 +10,25 @@ const emit = defineEmits(['submit', 'cancel']);
 
 const leaveForm = ref({
   applicant: '',
-  start_time: props.initialDate ? `${props.initialDate}T09:00` : '',
-  end_time: props.initialDate ? `${props.initialDate}T18:00` : '',
+  start_time: '',
+  end_time: '',
   leave_type: '事假',
   reason: ''
 });
 
 const leaveTypes = ['事假', '病假', '年假', '调休', '其他'];
 
-watch(() => props.initialDate, (newDate) => {
-  if (newDate) {
-    leaveForm.value.start_time = `${newDate}T09:00`;
-    leaveForm.value.end_time = `${newDate}T18:00`;
+watch(() => props.initialData, (newData) => {
+  if (newData) {
+    leaveForm.value = {
+      applicant: newData.applicant || '',
+      start_time: newData.start_time || '',
+      end_time: newData.end_time || '',
+      leave_type: newData.leave_type || '事假',
+      reason: newData.reason || ''
+    };
   }
-});
+}, { immediate: true, deep: true });
 
 const handleSubmit = () => {
   emit('submit', { ...leaveForm.value });

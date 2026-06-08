@@ -4,7 +4,6 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from langchain_core.messages import SystemMessage
 from app.core import config
-
 class AgentManager:
     def __init__(self):
         self.llm = None
@@ -29,29 +28,25 @@ class AgentManager:
         
         client = MultiServerMCPClient(server_config)
         try:
-            all_tools = await client.get_tools()
-            # 过滤工具
-            filtered_tools = [
-                tool for tool in all_tools 
-                if any(keyword in tool.name.lower() for keyword in ["area", "weather", "面积", "天气"])
-            ]
+            mcp_tools = await client.get_tools()
             
-            # 3. 创建系统提示词
+            # 3. 创建系统提示词 (强化意图识别)
             today = datetime.now().strftime("%Y-%m-%d")
             system_message = SystemMessage(
                 content=(
-                    f"今天是 {today}。\n"
-                    "你是一个助手，专门负责计算面积、查询天气预报以及处理请假申请。\n"
-                    "1. 对于『面积计算』或『天气预报』，请调用提供的工具。\n"
-                    "2. 当用户表达『请假』意图时，你必须在回复中包含且仅包含触发码：[[LEAVE_FORM:日期]]，日期格式 YYYY-MM-DD。\n"
-                    "3. 对于其他话题，礼貌拒绝并说明功能范围。\n"
-                    "请直接给出答案，不要涉及无关信息。"
+                    f"今天是 {today}，当前时间参考此日期。\n"
+                    "你是一个全能助手，负责处理面积计算、天气查询和行政请假流程。\n"
+                    "【核心规范】\n"
+                    "1. 当用户表达『请假』意图时，你必须且只能通过调用 'open_leave_form' 工具来响应。\n"
+                    "2. 请从对话中精准提取：请假人(applicant)、开始时间(start_time)、结束时间(end_time)、类型(leave_type)和原因(reason)。\n"
+                    "3. 相对时间转换：如果用户说『昨天』，请基于 {today} 计算出具体日期。时间格式必须符合 ISO 8601 (YYYY-MM-DDTHH:mm)。\n"
+                    "4. 不要只通过文字回复，必须调用工具。"
                 )
             )
 
             # 4. 创建 Agent
-            self.agent = create_react_agent(self.llm, filtered_tools, prompt=system_message)
-            print("Agent 启动成功，已连接至 MCP 服务器。")
+            self.agent = create_react_agent(self.llm, mcp_tools, prompt=system_message)
+            print("Agent 启动成功，已连接并同步 MCP 插件能力。")
         except Exception as e:
             print(f"Agent 初始化失败: {e}")
             raise e
